@@ -1,0 +1,12 @@
+name = "DFMs.jl"
+uuid = "51bb8ac4-c740-11ea-29fc-db8aeaca0f58"
+author = ["Daniel Hopp <daniel.hopp1@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+
+[compat]
+DataFrames = "≥ 0.20.0"
+julia = "≥ 1.0.0"
