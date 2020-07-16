@@ -1,5 +1,6 @@
 module DFMs
 
-include("estimate_dfm.jl")
+include("EstimateDFM.jl")
+include("HelperFunctions.jl")
 
 end

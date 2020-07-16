@@ -1,8 +1,11 @@
 using DataFrames
 using Statistics
 using CubicSplines
+using DSP
 
 export standardize
+export spline_fill
+export digital_filter
 export fill_na
 
 "return boolean vector of whether df columns are numeric"
@@ -48,6 +51,32 @@ end
 
 
 """
+    fill in missing tails of series using 1-D digital filter
+    parameters:
+        series : Array
+            series to fill leading/trailing missings
+        k : Int
+            rational transfer function argument's numerator
+    returns: Array
+        series with filled missings
+"""
+function digital_filter(series::Array)
+    tmp = copy(series) |> x->
+        [ismissing(a) ? missing : Float64(a) for a in x]
+    missing_indices = findall(ismissing.(tmp))
+    tmp[missing_indices] .= median(skipmissing(tmp))
+    tmp = tmp .|> Float64
+
+    responsetype = Lowpass(0.9)
+    designmethod = Butterworth(1)
+    ma = filt(digitalfilter(responsetype, designmethod), tmp)
+
+    tmp[missing_indices] = ma[missing_indices]
+    return tmp
+end
+
+
+"""
     remove missing/NAs in a dataframe
     parameters:
         df : DataFrame
@@ -57,17 +86,23 @@ end
 """
 function fill_na(df::DataFrame)
     tmp = copy(df)
+    is_numeric = numeric_cols(tmp)
+
     # if more than 80% of columns are missing in the beginning, drop the row
     threshold = 0.8
     mask = ([(x |> Array .|> ismissing |> sum) / ncol(tmp) for x in eachrow(tmp)] .<= threshold)
     mask = (mask .== 1) .| ([mask[1:end-1]; 1] .== 1)
     tmp = tmp[mask, :]
 
-    # fill missing values between with cubic spline
-    is_numeric = numeric_cols(tmp)
+    # if all entries are missing at the end, drop the row
+    mask = [!all(ismissing, Array(x)) for x in eachrow(tmp[!, is_numeric])]
+    tmp = tmp[mask, :]
+
+    # fill missing values between with cubic spline, fill head/tail with digital filter
     for i in 1:ncol(tmp)
         if is_numeric[i]
-
+            tmp[!, i] = spline_fill(tmp[!, i])
+            tmp[!, i] = digital_filter(tmp[!, i])
         end
     end
 
