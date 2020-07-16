@@ -50,4 +50,37 @@ impact = c(b-a), how this surprise changes the nowcast
 
 =#
 
-print(standardize(data))
+"""
+    estimate a dynamic factor model.
+    parameters:
+        Y : DataFrame | Array{Number, 2}
+            matrix of variables, size (n, p). Requires standardized matrix, pass standardize(df) if not already standardized. Requires no missings, pass fill_na(df) if not the case.
+        blocks : Array{Number, 2}, size (p, n_blocks)
+            matrix of 1s or 0s for block loadings, i.e. included in block.
+            ex for Y 2 x 3, 2 blocks:
+                [1, 0]
+                [1, 1]
+                [0, 1]
+        nQ : Array, size(1, p)
+            array of 1s or 0s determining if variable is quarterly or not
+            ex for Y 2 x 3, 2nd variable is quarterly:
+                [0, 1, 0]
+        r : Array, size (1, n_blocks)
+            number of common factors for each block
+            ex for 2 blocks, 1 factor and 2 factors:
+                [1, 2]
+        p : Int
+            number of lags in transition matrix (AR element)
+        threshold : Float
+            expectation maximization loop threshold
+    returns: ?
+        ?
+"""
+function estimate_dfm(Y; blocks, r, p=1)
+    threshold = 1e-5 # EM loop threshold
+    max_iter = 5000 # EM loop max number of iterations
+    R = [2 -1 0 0 0; 3 0 -1 0 0; 2 0 0 -1 0; 1 0 0 0 -1] # R*λ = q; constraints on loadings of quarterly variables
+    n, p = size(Y)
+
+
+end
