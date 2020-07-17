@@ -81,12 +81,13 @@ end
     parameters:
         df : DataFrame
             dataframe to fill NAs
-    returns: DataFrame
-        dataframe with filled NAs
+    returns: Dict
+        Dict(:output => df with NAs filled, :na_indices => df of Bool is na)
 """
 function fill_na(df::DataFrame)
     tmp = copy(df)
     is_numeric = numeric_cols(tmp)
+    na_indices = ismissing.(tmp)
 
     # if more than 80% of columns are missing in the beginning, drop the row
     threshold = 0.8
@@ -106,5 +107,5 @@ function fill_na(df::DataFrame)
         end
     end
 
-    return tmp
+    return Dict(:output => tmp, :na_indices => na_indices)
 end
