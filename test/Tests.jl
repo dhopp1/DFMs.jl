@@ -3,6 +3,7 @@ include("../src/HelperFunctions.jl")
 using DataFrames
 using Statistics
 using Dates
+using LinearAlgebra
 
 @testset "Helper functions" begin
 

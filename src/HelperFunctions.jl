@@ -121,10 +121,10 @@ end
             array of corresponding dates for the matrix
         df : DataFrame
             dataframe to get monthly and quarterly variables from
-    returns: Array{Int64, 1}
+    returns: Array{Bool, 1}
         array of 1's (is quarterly) and 0's (is not quarterly, i.e. monthly)
 """
-function gen_monthly_quarterly(dates::Array{Dates.Date}, df::DataFrame)
+function gen_monthly_quarterly(dates::Array{Dates.Date}, df::DataFrame)::Array{Bool, 1}
     is_quarterly = []
     for i in 1:ncol(df)
         quarterly = ([Month(x).value for x in dates[.!ismissing.(df[!, i])]] |> Set) |> x->
