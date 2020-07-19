@@ -2,6 +2,7 @@ using DataFrames
 using Statistics
 using CubicSplines
 using DSP
+using Dates
 
 export standardize
 export spline_fill
@@ -86,8 +87,10 @@ end
 """
 function fill_na(df::DataFrame)
     tmp = copy(df)
-    is_numeric = numeric_cols(tmp)
+    # adding a false at end for the index column
+    is_numeric = [numeric_cols(tmp); false]
     na_indices = ismissing.(tmp)
+    tmp[!, :index] = 1:nrow(tmp)
 
     # if more than 80% of columns are missing in the beginning, drop the row
     threshold = 0.8
@@ -107,5 +110,26 @@ function fill_na(df::DataFrame)
         end
     end
 
-    return Dict(:output => tmp, :na_indices => na_indices)
+    return Dict(:output => tmp[!, Not(:index)], :na_indices => na_indices[tmp.index,:])
+end
+
+
+"""
+    generate matrix of monthly and quarterly variables
+    parameters:
+        dates : Array{Dates.Date}
+            array of corresponding dates for the matrix
+        df : DataFrame
+            dataframe to get monthly and quarterly variables from
+    returns: Array{Int64, 1}
+        array of 1's (is quarterly) and 0's (is not quarterly, i.e. monthly)
+"""
+function gen_monthly_quarterly(dates::Array{Dates.Date}, df::DataFrame)
+    is_quarterly = []
+    for i in 1:ncol(df)
+        quarterly = ([Month(x).value for x in dates[.!ismissing.(df[!, i])]] |> Set) |> x->
+            isequal(x, Set([3,6,9,12]))
+        push!(is_quarterly, quarterly)
+    end
+    return is_quarterly
 end

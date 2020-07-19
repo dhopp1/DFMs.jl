@@ -1,3 +1,4 @@
+cd("/home/danhopp/dhopp1/DFMs.jl/src")
 using DataFrames
 using Statistics
 include("HelperFunctions.jl")
@@ -76,7 +77,18 @@ impact = c(b-a), how this surprise changes the nowcast
         ?
 """
 function init_conds(Y; )
-    
+    # temp data read
+    tmp = fill_na(data[!, Not(:date)])
+    Y = tmp[:output]
+    na_indices = tmp[:na_indices]
+    blocks = ones(ncol(Y))
+    n, z = size(Y)
+
+    y_tmp = copy(Y)
+    allowmissing!(y_tmp)
+    for i in 1:ncol(y_tmp)
+        y_tmp[na_indices[!, i], i] .= missing
+    end
 end
 
 
