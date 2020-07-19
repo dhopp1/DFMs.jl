@@ -1,9 +1,11 @@
 include("../src/HelperFunctions.jl")
+include("../src/InitialConditions.jl")
 
 using DataFrames
 using Statistics
 using Dates
 using LinearAlgebra
+using SparseArrays
 
 @testset "Helper functions" begin
 
@@ -31,4 +33,20 @@ using LinearAlgebra
 		)
 	)
 	@test gen_monthly_quarterly(test_dates, test_data) == [0,1]
+end
+
+
+@testset "Initial conditions" begin
+	Y = DataFrame(Dict(:a=>[1,2,4,3,2], :b=>[2,1,3,1,5]))
+	dates = [Dates.Date(2020,1,1), Dates.Date(2020,2,1), Dates.Date(2020,3,1), Dates.Date(2020,4,1), Dates.Date(2020,5,1)]
+	blocks = DataFrame(Dict(:a=>[1.0, 1.0], :b=>[1.0, 1.0]))
+	R_mat = [2 -1 0 0 0; 3 0 -1 0 0; 2 0 0 -1 0; 1 0 0 0 -1]
+	tmp = initialize_conditions(Y; dates=dates, p=1, blocks=blocks, R_mat=R_mat)
+
+	@test sum(tmp[:A]) - 2.438 < 0.001
+	@test sum(tmp[:C]) - 4.2649 < 0.001
+	@test isequal(sum(tmp[:Q]), NaN)
+	@test tmp[:R] == [0.0001 0.0; 0.0 0.0001]
+	@test tmp[:Z0] == zeros(12)
+	@test isequal(sum(tmp[:V0]), NaN)
 end
