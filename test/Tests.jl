@@ -1,5 +1,6 @@
 include("../src/HelperFunctions.jl")
 include("../src/InitialConditions.jl")
+include("../src/KalmanFilter.jl")
 
 using Suppressor
 
@@ -8,6 +9,9 @@ using Statistics
 using Dates
 using LinearAlgebra
 using SparseArrays
+using CSV
+
+sample_data = CSV.read("test_data.csv") |> DataFrame
 
 @testset "Helper functions" begin
 
@@ -57,4 +61,22 @@ end
 	@test tmp[:R] == [0.0001 0.0; 0.0 0.0001]
 	@test tmp[:Z0] == zeros(12)
 	@test isequal(sum(tmp[:V0]), NaN)
+end
+
+@testset "Kalman filter" begin
+	q = zeros(4)
+	y_tmp = sample_data[!, Not(:date)]
+	dates = sample_data[!, :date]
+	monthly_quarterly_array = gen_monthly_quarterly(dates, y_tmp)
+	R_mat = [2 -1 0 0 0; 3 0 -1 0 0; 2 0 0 -1 0; 1 0 0 0 -1]
+	blocks = DataFrame(a=ones(size(y_tmp)[2]-1), b=ones(size(y_tmp)[2]-1))
+	init_conds = initialize_conditions(y_tmp; dates=dates, p=1, blocks=blocks, R_mat=R_mat)
+    A = init_conds[:A]; C = init_conds[:C]; Q = init_conds[:Q]; R = init_conds[:R]; Z0 = init_conds[:Z0]; V0 = init_conds[:V0]
+	y_est = y_tmp[[sum(.!ismissing.(Array(x))) > 0 for x in eachrow(y_tmp)], :] |> Array |> transpose
+	output = kalman_filter(y_est, A, C, Q, R, Z0, V0)
+
+	@test sum(output[:Zsmooth]) ≈ 16.9734395062919
+	@test sum(output[:Vsmooth]) ≈ 872.1521836796258
+	@test sum(output[:VVsmooth]) ≈ 283.92273510769024
+	@test sum(output[:loglik]) ≈ 509.2892978152599
 end

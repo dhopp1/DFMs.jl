@@ -30,5 +30,99 @@
        loglik => scalar, log-likelihood
 """
 function kalman_filter(y_est, A, C, Q, R, Z0, V0)
-    
+    # initialize
+    m = size(C)[2]
+    n_obs = size(y_est)[2]
+    Zm = Array{Union{Missing, Float64},2}(undef, m, n_obs) # Z_t | t-1 (prior)
+    Vm = Array{Union{Missing, Float64},3}(undef, m, m, n_obs) # V_t | t-1 (prior)
+    ZmU = Array{Union{Missing, Float64},2}(undef, m, n_obs+1) # Z_t | t (posterior/updated)
+    VmU = Array{Union{Missing, Float64},3}(undef, m, m, n_obs+1) # V_t | t (posterior/updated)
+    ZmT = [0.0 for i in 1:(m * (n_obs + 1))] |> x-> reshape(x, m, n_obs + 1) # Z_t | T (smoothed states)
+    VmT = [0.0 for i in 1:(m * m * (n_obs + 1))] |> x-> reshape(x, m, m, n_obs + 1) # V_t | T = Cov(Z_t|T) (smoothed factor covariance)
+    VmT_lag = Array{Union{Missing, Float64},3}(undef, m, m, n_obs) # Cov(Z_t, Z_t-1|T) (smoothed lag 1 factor covariance)
+    loglik = 0
+
+    # initial values
+    Zu = Z0 # Z_0|0 (In loop, Zu gives Z_t | t)
+    Vu = V0 # V_0|0 (In loop, Vu gives V_t | t)
+    ZmU[:, 1] = Zu
+    VmU[:,:, 1] = Vu
+
+    # kalman filter
+    for t in 1:n_obs
+        ### Calculate prior distribution
+        Z = A * Zu # Use transition equation to create prior estimate for factor, i.e. Z = Z_t|t-1
+        V = A * Vu * transpose(A) + Q # Prior covariance matrix of Z (i.e. V = V_t|t-1)
+        V = 0.5 * (V + transpose(V))  # Trick to make symmetric
+
+        ### Calculate posterior distribution
+        non_missing = findall(!ismissing, y_est[:,t]) # Remove missing series: These are removed from Y, C, and R
+        global yt = y_est[:,t][non_missing]
+        global Ct = C[non_missing,:]
+        Rt = R[non_missing,non_missing]
+
+        # Check if yt contains no data; if this is the case, replace Zu and Vu with prior
+        if length(yt) == 0
+            Zu = Z
+            Vu = V
+        else
+            # Steps for variance and population regression coefficients:
+            VC = V * transpose(Ct)
+            iF = inv(Ct * VC + Rt)
+            global VCF = VC * iF # Matrix of population regression coefficients (QuantEcon eqn #4)
+            innov = yt - Ct * Z # Gives difference between actual and predicted measurement matrix values
+            Zu  = Z  + VCF * innov # Update estimate of factor values (posterior)
+            Vu = V - VCF * transpose(VC) # Update covariance matrix (posterior) for time t
+            Vu = 0.5 * (Vu + transpose(Vu)) # Trick to make symmetric
+            loglik = loglik + 0.5 * (log(det(iF)) - transpose(innov) * iF * innov) # Update log likelihood
+        end
+
+        ### Store output
+        # Store covariance and observation values for t-1 (priors)
+        Zm[:,t] = Z
+        Vm[:,:,t] = V
+        # Store covariance and state values for t (posteriors), i.e. Zu = Z_t|t & Vu = V_t|t
+        ZmU[:,t + 1] = Zu
+        VmU[:,:,t + 1] = Vu
+    end
+
+    # Store Kalman gain k_t
+    if length(yt) == 0
+        k_t = zeros(m, m)
+    else
+        k_t = VCF * Ct
+    end
+
+    ### Apply fixed interval smoother
+    # Fill the final period of ZmT & VmT with posterior values from KF
+    ZmT[:,n_obs + 1] = ZmU[:,n_obs + 1]
+    VmT[:,:,n_obs + 1] = VmU[:,:,n_obs + 1]
+    VmT_lag[:,:,n_obs] = (I(m) - k_t) * A * VmU[:,:,n_obs] # Initialize VmT_1 lag 1 covariance matrix for final period
+    J_2 = VmU[:,:, n_obs] * transpose(A) * pinv(Vm[:,:,n_obs]) # Used for recursion process, see companion file for details
+
+    ### Run smoothing algorithm
+    # Loop through time reverse-chronologically (starting at final period nobs)
+    for t in n_obs:-1:1
+        # Store posterior and prior factor covariance values
+        VmUt = VmU[:,:,t]
+        Vmt = Vm[:,:,t]
+        # Store previous period smoothed factor covariance and lag-1 covariance
+        Vt = VmT[:,:,t+1]
+        Vt_lag = VmT_lag[:,:,t]
+        J_1 = copy(J_2)
+        ZmT[:,t] = ZmU[:,t] + J_1 * (ZmT[:,t+1] - A * ZmU[:,t])  # Update smoothed factor estimate
+        VmT[:,:,t] = VmUt + J_1 * (Vt - Vmt) * transpose(J_1) # Update smoothed factor covariance matrix
+        if t > 1
+            J_2 = VmU[:,:,t-1] * transpose(A) * pinv(Vm[:,:,t-1]) # Update weight
+            VmT_lag[:,:,t-1] = VmUt * transpose(J_2) + J_1 * (Vt_lag - A * VmUt) * transpose(J_2) # Update lag 1 factor covariance matrix
+        end
+    end
+
+    ### output
+    return Dict(
+        :Zsmooth => ZmT,
+        :Vsmooth => VmT,
+        :VVsmooth => VmT_lag,
+        :loglik => loglik
+    )
 end

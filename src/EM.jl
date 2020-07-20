@@ -52,4 +52,7 @@ function EM_step(y_est, A, C, Q, R, Z0, V0, p, blocks, R_mat, q, nM, nQ, monthly
     n_blocks = size(blocks)[2]
 
     output = kalman_filter(y_est, A, C, Q, R, Z0, V0)
+    Zsmooth = output[:Zsmooth]; Vsmooth = output[:Vsmooth]; VVsmooth = output[:VVsmooth]; loglik = output[:loglik]
+
+    ### MAXIMIZATION STEP (TRANSITION EQUATION). See Banbura & Modugno (2010) for details.
 end
