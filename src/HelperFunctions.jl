@@ -8,6 +8,7 @@ export standardize
 export spline_fill
 export digital_filter
 export fill_na
+export date_col_name
 
 "return boolean vector of whether df columns are numeric"
 numeric_cols(df::DataFrame) = [(Float64 <: eltype(df[!, i])) | (Int64 <: eltype(df[!, i])) for i in 1:ncol(df)]
@@ -132,4 +133,22 @@ function gen_monthly_quarterly(dates::Array{Dates.Date}, df::DataFrame)::Array{B
         push!(is_quarterly, quarterly)
     end
     return is_quarterly
+end
+
+
+"""
+    return name of first date column of a dataframe
+    parameters:
+        df : DataFrame
+            dataframe containing a date column
+    returns: Symbol
+        name of the first date column
+"""
+function date_col_name(df::DataFrame)
+    try
+        return findall(x->x==Dates.Date, eltype.(eachcol(df)))[1] |> i->
+            names(df)[i]
+    catch e
+        println("No column of type Dates.Date")
+    end
 end

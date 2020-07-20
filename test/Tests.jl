@@ -1,6 +1,8 @@
 include("../src/HelperFunctions.jl")
 include("../src/InitialConditions.jl")
 
+using Suppressor
+
 using DataFrames
 using Statistics
 using Dates
@@ -33,6 +35,12 @@ using SparseArrays
 		)
 	)
 	@test gen_monthly_quarterly(test_dates, test_data) == [0,1]
+
+	# testing date_col_name function
+	test_data = DataFrame(a=[Dates.Date(2020,1,1), Dates.Date(2020,2,1)], b=[1,2])
+	@test date_col_name(test_data) == :a
+	error_out = @capture_out date_col_name(test_data[!, Not(:a)])
+	@test error_out == "No column of type Dates.Date\n"
 end
 
 

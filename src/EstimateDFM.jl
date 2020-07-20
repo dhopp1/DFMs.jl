@@ -1,7 +1,10 @@
 cd("/home/danhopp/dhopp1/DFMs.jl/src")
+include("HelperFunctions.jl")
+include("InitialConditions.jl")
+
 using DataFrames
 using Statistics
-include("HelperFunctions.jl")
+
 
 ### temporary, setting up sample data
 using jdplyr
@@ -51,19 +54,36 @@ impact = c(b-a), how this surprise changes the nowcast
 
 =#
 
+# temporary
+Y = copy(data)
+blocks = DataFrame(a=ones(size(Y)[2]-1), b=ones(size(Y)[2]-1))
+p = 1
+threshold = 1e-5
+max_iter = 5000
+# end temporary
+
 """
     estimate a dynamic factor model.
     parameters:
         Y : DataFrame | Array{Number, 2}
-            matrix of variables, size (n, z). Requires standardized matrix, pass standardize(df) if not already standardized. Requires no missings, pass fill_na(df) if not the case.
+            matrix of variables, size (n_obs, n_variables). Must include a column of type Dates.Date.
+        blocks : DataFrame, size (n_variables, n_blocks). Note don't include date column in n_variables
+            matrix of 1s or 0s for block loadings, i.e. included in block.
+            ex for Y 2 x 3, 2 blocks:
+                [1, 0]
+                [1, 1]
+                [0, 1]
+        p : Int
+            number of lags in transition equation
+        max_iter : Int
+            number of iterations for EM
+        threshold : Float
+            EM loop threshold
     returns: ?
         ?
 """
-function estimate_dfm(Y; blocks, r, p)
-    threshold = 1e-5 # EM loop threshold
-    max_iter = 5000 # EM loop max number of iterations
+function estimate_dfm(Y; blocks, r, p, max_iter=5000, threshold=1e-5)
     R_mat = [2 -1 0 0 0; 3 0 -1 0 0; 2 0 0 -1 0; 1 0 0 0 -1] # R*λ = q; constraints on loadings of quarterly variables
-    n, z = size(Y)
 
 
 end
