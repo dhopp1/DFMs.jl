@@ -84,6 +84,34 @@ max_iter = 5000
 """
 function estimate_dfm(Y; blocks, r, p, max_iter=5000, threshold=1e-5)
     R_mat = [2 -1 0 0 0; 3 0 -1 0 0; 2 0 0 -1 0; 1 0 0 0 -1] # R*λ = q; constraints on loadings of quarterly variables
+    q = zeros(4)
+    dates = Y[!, date_col_name(Y)]
+    y_tmp = Y[!, Not(date_col_name(Y))]
+    monthly_quarterly_array = gen_monthly_quarterly(dates, y_tmp)
+
+    # calculate initial variables
+    init_conds = initialize_conditions(y_tmp; dates=dates, p=p, blocks=blocks, R_mat=R_mat)
+    A = init_conds[:A]; C = init_conds[:C]; Q = init_conds[:Q]; R = init_conds[:R]; Z0 = init_conds[:Z0]; V0 = init_conds[:V0]
+
+    # initialize EM loop values
+    #= EM model
+    y = C*Z + e
+    z = A*Z(-1) + v
+    where y is n_obs x n_variables, Z is (pr) x n_variables, etc.
+    =#
+
+    # remove leading and ending rows where all missing, transpose
+    y_est = y_tmp[[sum(.!ismissing.(Array(x))) > 0 for x in eachrow(y_tmp)], :] |> Array |> transpose
+    prev_loglik = -1e6
+    num_iter = 0
+    LL = -1e6
+    converged = 0
+    y = transpose(y_tmp |> Array) # y for the estimation is WITH missing data
+
+    # EM loop
+    while !converged & num_iter <= max_iter
+        em_output = EM_step(y_est, A, C, Q, R, Z0, V0, p, blocks, R_mat, q, nM, nQ, .!monthly_quarterly_array)
+    end
 
 
 end
