@@ -88,6 +88,9 @@ function estimate_dfm(Y; blocks, r, p, max_iter=5000, threshold=1e-5)
     dates = Y[!, date_col_name(Y)]
     y_tmp = Y[!, Not(date_col_name(Y))]
     monthly_quarterly_array = gen_monthly_quarterly(dates, y_tmp)
+    # put all quarterly variables to the end
+    y_tmp = [y_tmp[!, .!monthly_quarterly_array]  y_tmp[!, monthly_quarterly_array]]
+    monthly_quarterly_array = gen_monthly_quarterly(dates, y_tmp)
 
     # calculate initial variables
     init_conds = initialize_conditions(y_tmp; dates=dates, p=p, blocks=blocks, R_mat=R_mat)
@@ -110,7 +113,7 @@ function estimate_dfm(Y; blocks, r, p, max_iter=5000, threshold=1e-5)
 
     # EM loop
     while !converged & num_iter <= max_iter
-        em_output = EM_step(y_est, A, C, Q, R, Z0, V0, p, blocks, R_mat, q, nM, nQ, .!monthly_quarterly_array)
+        em_output = EM_step(y_est, A, C, Q, R, Z0, V0, p, blocks, R_mat, q, nM, nQ, monthly_quarterly_array)
     end
 
 
