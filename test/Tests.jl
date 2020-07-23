@@ -1,6 +1,8 @@
 include("../src/HelperFunctions.jl")
 include("../src/InitialConditions.jl")
 include("../src/KalmanFilter.jl")
+include("../src/EM.jl")
+include("../src/EstimateDFM.jl")
 
 using Suppressor
 
@@ -11,7 +13,32 @@ using LinearAlgebra
 using SparseArrays
 using CSV
 
+
+# data set up
 sample_data = CSV.read("test_data.csv") |> DataFrame
+y_tmp = sample_data[!, Not(:date)]
+dates = sample_data[!, :date]
+q = zeros(4)
+p = 1
+monthly_quarterly_array = gen_monthly_quarterly(dates, y_tmp)
+R_mat = [2 -1 0 0 0; 3 0 -1 0 0; 2 0 0 -1 0; 1 0 0 0 -1]
+blocks = DataFrame(a=ones(size(y_tmp)[2]-1), b=ones(size(y_tmp)[2]-1))
+init_conds = initialize_conditions(y_tmp; dates=dates, p=1, blocks=blocks, R_mat=R_mat)
+A = init_conds[:A]; C = init_conds[:C]; Q = init_conds[:Q]; R = init_conds[:R]; Z0 = init_conds[:Z0]; V0 = init_conds[:V0]
+y_est = y_tmp[[sum(.!ismissing.(Array(x))) > 0 for x in eachrow(y_tmp)], :] |> Array |> transpose
+nM = sum(.!monthly_quarterly_array)
+
+# creating an artificial lagged dataset
+function create_lag(x, lag)
+    new = copy(x)
+    for i in 2:ncol(x)
+        last_data_index = findall(!ismissing, x[!, i])[end]
+        new[(last_data_index-lag+1):last_data_index, i] .= missing
+    end
+    return new
+end
+data_lag = create_lag(sample_data, 1)
+
 
 @testset "Helper functions" begin
 
@@ -53,7 +80,7 @@ end
 	dates = [Dates.Date(2020,1,1), Dates.Date(2020,2,1), Dates.Date(2020,3,1), Dates.Date(2020,4,1), Dates.Date(2020,5,1)]
 	blocks = DataFrame(Dict(:a=>[1.0, 1.0], :b=>[1.0, 1.0]))
 	R_mat = [2 -1 0 0 0; 3 0 -1 0 0; 2 0 0 -1 0; 1 0 0 0 -1]
-	tmp = initialize_conditions(Y; dates=dates, p=1, blocks=blocks, R_mat=R_mat)
+	tmp = initialize_conditions(Y; dates=dates, p=p, blocks=blocks, R_mat=R_mat)
 
 	@test sum(tmp[:A]) - 2.438 < 0.001
 	@test sum(tmp[:C]) - 4.2649 < 0.001
@@ -64,19 +91,52 @@ end
 end
 
 @testset "Kalman filter" begin
-	q = zeros(4)
-	y_tmp = sample_data[!, Not(:date)]
-	dates = sample_data[!, :date]
-	monthly_quarterly_array = gen_monthly_quarterly(dates, y_tmp)
-	R_mat = [2 -1 0 0 0; 3 0 -1 0 0; 2 0 0 -1 0; 1 0 0 0 -1]
-	blocks = DataFrame(a=ones(size(y_tmp)[2]-1), b=ones(size(y_tmp)[2]-1))
-	init_conds = initialize_conditions(y_tmp; dates=dates, p=1, blocks=blocks, R_mat=R_mat)
-    A = init_conds[:A]; C = init_conds[:C]; Q = init_conds[:Q]; R = init_conds[:R]; Z0 = init_conds[:Z0]; V0 = init_conds[:V0]
-	y_est = y_tmp[[sum(.!ismissing.(Array(x))) > 0 for x in eachrow(y_tmp)], :] |> Array |> transpose
 	output = kalman_filter(y_est, A, C, Q, R, Z0, V0)
 
 	@test sum(output[:Zsmooth]) ≈ 16.9734395062919
 	@test sum(output[:Vsmooth]) ≈ 872.1521836796258
 	@test sum(output[:VVsmooth]) ≈ 283.92273510769024
 	@test sum(output[:loglik]) ≈ 509.2892978152599
+end
+
+@testset "EM" begin
+	em_output = EM_step(y_est; A=A, C=C, Q=Q, R=R, Z0=Z0, V0=V0, p=p, blocks=blocks, R_mat=R_mat, q=q, nM=nM, monthly_quarterly_array=monthly_quarterly_array)
+
+	@test sum(em_output[:A_new]) ≈ 11.6799558151333
+	@test sum(em_output[:C_new]) ≈ 22.349648436221734
+	@test sum(em_output[:Q_new]) ≈ 1.6498771441810458
+	@test sum(em_output[:Z0]) ≈ 0.031060939148336537
+	@test sum(em_output[:V0]) ≈ 49.20972973859572
+	@test sum(em_output[:loglik]) ≈ 509.2892978152599
+
+	loglik = 10; prev_loglik = 1e-6;
+	converged, decrease = values(EM_convergence(loglik, prev_loglik, 1e-5))
+	@test converged == 0
+	@test decrease == 0
+
+	loglik = 1e-8; prev_loglik = 5;
+	converged, decrease = values(EM_convergence(loglik, prev_loglik, 1e-1))
+	@test converged == 0
+	@test decrease == 1
+
+	loglik = 2; prev_loglik = 5;
+	converged, decrease = values(EM_convergence(loglik, prev_loglik, 1))
+	@test converged == 1
+	@test decrease == 1
+end
+
+@testset "EstimateDFM" begin
+	output = estimate_dfm(sample_data; blocks=blocks, p=p, max_iter=10, threshold=1e-5)
+
+	@test sum(output[:Xsmooth_std]) ≈ 10.511990707459224
+	@test sum(output[:C]) ≈ 21.979826198523067
+	@test sum(output[:R]) ≈ 0.0011
+	@test sum(output[:A]) ≈ 12.768581356259535
+	@test sum(output[:Q]) ≈ 0.15526910701420402
+	@test sum(output[:means]) ≈ 0.060732284509809845
+	@test sum(output[:stds]) ≈ 0.5829554656784255
+	@test sum(output[:Z0]) ≈ 0.7554301411482052
+	@test sum(output[:V0]) ≈ 49.20972973859572
+	@test sum(output[:loglik]) ≈ 6414.119209820474
+	@test sum(output[:LL]) ≈ 53946.7817953308
 end

@@ -1,5 +1,8 @@
 include("KalmanFilter.jl")
 
+export EM_step
+export EM_convergence
+
 """
     This function reestimates parameters based on the Estimation Maximization (EM) algorithm. This is a two-step procedure:
     (1) E-step: the expectation of the log-likelihood is calculated using previous parameter estimates.
@@ -31,8 +34,6 @@ include("KalmanFilter.jl")
             constraints on loadings
         nM: Int
             number of monthly variables
-        nQ: Int
-            number of quarterly variables
         monthly_quarterly_array: Array
             indices for quarterly variables
     returns: Dict
@@ -42,9 +43,9 @@ include("KalmanFilter.jl")
         R_new => updated covariance matrix for residuals of measurement equation
         Z0 => initial value of state
         V0 => initial value of factor covariance matrix
-        loglik: log likelihood
+        loglik => log likelihood
 """
-function EM_step(y_est, A, C, Q, R, Z0, V0, p, blocks, R_mat, q, nM, nQ, monthly_quarterly_array)
+function EM_step(y_est; A, C, Q, R, Z0, V0, p, blocks, R_mat, q, nM, monthly_quarterly_array)
     n = size(y_est)[1]
     n_obs = size(y_est)[2]
     pC = size(R_mat)[2]
@@ -164,8 +165,7 @@ function EM_step(y_est, A, C, Q, R, Z0, V0, p, blocks, R_mat, q, nM, nQ, monthly
         # Update monthly variables: loop through each period
         for t in 1:n_obs
             Wt = diagm(.!ismissing.(y_est)[idx_iM,t]) * 1 # Gives selection matrix (TRUE for nonmissing values)
-            println(sum(Wt))
-            bl_idxM_ext = vcat(bl_idxM[i,:], repeat([false], size(Zsmooth)[1] - length(bl_idxM)))
+            global bl_idxM_ext = vcat(bl_idxM[i,:], repeat([false], size(Zsmooth)[1] - length(bl_idxM)))
             # E[f_t * t_t' | Omega_T]
             denom = denom + kron(Zsmooth[bl_idxM_ext, t + 1] * transpose(Zsmooth[bl_idxM_ext, t + 1]) + Vsmooth[bl_idxM_ext, bl_idxM_ext, t + 1], Wt)
             # E[y_t * f_t' | Omega_T]
@@ -176,6 +176,107 @@ function EM_step(y_est, A, C, Q, R, Z0, V0, p, blocks, R_mat, q, nM, nQ, monthly
                 Vsmooth[rp1 .+ index_freq_ii, bl_idxM_ext, t + 1])
         end
         vec_C = inv(denom) * reshape(nom, prod(collect(size(nom)), dims=1)[1]) # Eqn 13 BGR 2010
+        C_new[idx_iM, bl_idxM_ext] = reshape(vec_C, Int(n_i), Int(rs)) # Place updated monthly results in output matrix
+        idx_iQ = idx_i[idx_i .> nM] # Index for quarterly series
+        rps = rs * ppC
+        # Monthly-quarterly aggregation scheme
+        R_con_i = R_con[:,bl_idxQ[i,:]]
+        q_con_i = copy(q_con)
+        no_c = [!all(x->Int(x)==0,row) for row in eachrow(R_con_i)] # any non-zero values in row
+        R_con_i = R_con_i[no_c,:]
+        q_con_i = q_con_i[no_c,:]
 
+        # Loop through quarterly series in loading, this parallels monthly code
+        for j in idx_iQ
+            # Initialization
+            denom = zeros(Int(rps), Int(rps))
+            nom = zeros(1, Int(rps))
+            idx_jQ = j - nM # Ordinal position of quarterly variable
+            # Location of factor structure corresponding to quarterly variable residuals
+            index_freq_jQ = (rp1 + n_index_M + 5 * (idx_jQ - 1) + 1):(rp1 + n_index_M + 5 * idx_jQ)
+            # Place quarterly values in output matrix
+            V0_new[index_freq_jQ, index_freq_jQ] = Vsmooth[index_freq_jQ, index_freq_jQ, 1]
+            A_new[index_freq_jQ[1], index_freq_jQ[1]] = Ai[index_freq_jQ[1] - rp1, index_freq_jQ[1] - rp1]
+            Q_new[index_freq_jQ[1], index_freq_jQ[1]] = Qi[index_freq_jQ[1] - rp1, index_freq_jQ[1] - rp1]
+            # Update quarterly variables: loop through each period
+            for t in 1:n_obs
+                Wt = diagm(.!ismissing.(y_est)[idx_iQ,t]) .* 1.0 # Selection matrix for quarterly values
+                # Intermediate steps in BGR equation 13
+                bl_idxQ_ext = vcat(bl_idxQ[i,:], repeat([false], size(Zsmooth)[1] - size(bl_idxQ)[2]))
+                denom = denom + kron(Zsmooth[bl_idxQ_ext, t + 1] * transpose(Zsmooth[bl_idxQ_ext, t + 1]) +  Vsmooth[bl_idxQ_ext, bl_idxQ_ext, t + 1], Wt)
+                nom = nom + y[j,t] * transpose(Zsmooth[bl_idxQ_ext, t + 1])
+                nom = nom - Wt * ([1 2 3 2 1] * Zsmooth[index_freq_jQ, t + 1] * transpose(Zsmooth[bl_idxQ_ext, t + 1]) + [1 2 3 2 1] * Vsmooth[index_freq_jQ, bl_idxQ_ext, t + 1])
+            end
+            C_i = inv(denom) * transpose(nom)
+            # BGR equation 13
+            C_i_constr = C_i - inv(denom) * transpose(R_con_i) * inv(R_con_i * inv(denom) * transpose(R_con_i)) * (R_con_i * C_i - q_con_i)
+            C_new[j, bl_idxQ_ext] = C_i_constr # Place updated values in output structure
+        end
     end
+
+    # 3B. Update covariance of residuales for measurement equation
+    # Initialize covariance of residuals of observation equation
+    R_new = zeros(Int(n), Int(n))
+    for t in 1:n_obs
+        Wt = diagm(.!ismissing.(y_est)[:,t]) * 1.0 # Selection matrix
+        # BGR equation 15
+        R_new = R_new + (y[:,t] - Wt * C_new * Zsmooth[:,t + 1]) * transpose(y[:,t] - Wt * C_new * Zsmooth[:,t + 1]) +
+            Wt * C_new * Vsmooth[:,:,t + 1] * transpose(C_new) * Wt + (collect(I(n)) - Wt) * R * (collect(I(n)) - Wt)
+    end
+    RR = diag(R_new)
+    RR[.!monthly_quarterly_array] .= 1e-4 # Ensure non-zero measurement error, see Doz, Giannone, Reichlin (2012) for reference
+    RR[(nM + 1):end] .= 1e-4
+    R_new = diagm(RR)
+
+    # final return
+    return Dict(
+        :A_new => A_new,
+        :C_new => C_new,
+        :Q_new => Q_new,
+        :R_new => R_new,
+        :Z0 => Z0,
+        :V0 => V0,
+        :loglik => loglik
+        )
+end
+
+
+"""
+  This function checks whether EM has converged. Convergence occurs if the slope of the log-likelihood function falls below 'threshold' (i.e. f(t) - f(t-1)| / avg < threshold) where avg = (|f(t)| + |f(t-1)|)/2 and f(t) is log likelihood at iteration t.
+      This stopping criterion is from Numerical Recipes in C (pg. 423). With MAP estimation (using priors), the likelihood can decrease even if the mode of the posterior increases.
+  (1) E-step: the expectation of the log-likelihood is calculated using previous parameter estimates.
+  (2) M-step: Parameters are re-estimated through the maximisation of the log-likelihood (maximise result from (1)).
+  See "Maximum likelihood estimation of factor models on data sets with arbitrary pattern of missing data" for details about parameter derivation (Banbura & Modugno, 2010).
+
+  parameters:
+      loglik: Float
+          log-likelihood from current EM iteration
+      prev_loglik: Float
+          log-likelihood from previous EM iteration
+      threshold: Float
+          convergence threshhold
+  returns: Dict
+      converged => 1 if convergence criteria satistifed, 0 otherwise
+      decrease => 1 if log likelihood decreased, 0 otherwise
+"""
+function EM_convergence(loglik, prev_loglik, threshold)::Dict{Symbol, Int64}
+    # initialization
+    converged = 0
+    decrease = 0
+
+    if (loglik - prev_loglik) < -1e-3 # allows for imprecision
+        decrease = 1
+    end
+    # check convergence criteria
+    delta = abs(loglik - prev_loglik)
+    avg_loglik = (abs(loglik) + abs(prev_loglik) + eps()) / 2
+
+    if ((delta / avg_loglik) < threshold)
+        converged = 1
+    end
+
+    return Dict(
+        :converged => converged,
+        :decrease => decrease
+    )
 end
