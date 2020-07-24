@@ -3,6 +3,7 @@ include("../src/InitialConditions.jl")
 include("../src/KalmanFilter.jl")
 include("../src/EM.jl")
 include("../src/EstimateDFM.jl")
+include("../src/Update.jl")
 
 using Suppressor
 
@@ -155,4 +156,19 @@ end
 	@test sum(output[:V0]) ≈ 49.20972973859572
 	@test sum(output[:loglik]) ≈ 6414.119209820474
 	@test sum(output[:LL]) ≈ 53946.7817953308
+end
+
+@testset "Update" begin
+	output_dfm = estimate_dfm(sample_data; blocks=blocks, p=p, max_iter=10, threshold=1e-5)
+	news = news_dfm(;old_y=data_lag, new_y=sample_data, output_dfm=output_dfm, target_variable=Symbol("x_world.sa"), target_period=Dates.Date(2020,6,1))
+
+	@test sum(news[:actual]) ≈ -0.6080187052009832
+	@test sum(news[:forecast]) ≈ -0.7934991526023685
+	@test sum(news[:weight]) ≈ 0.3377434672020498
+	@test sum(news[:innov]) ≈ 15.119737715315845
+	@test sum(news[:row_miss]) ≈ 2427
+	@test sum(news[:col_miss]) ≈ 66
+	@test sum(news[:singlenews]) ≈ -0.013155651969646982
+	@test sum(news[:y_old]) ≈ 0.010865864832867203
+	@test sum(news[:y_new]) ≈ -0.01335101140300618
 end
