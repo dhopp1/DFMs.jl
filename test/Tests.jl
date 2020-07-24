@@ -38,6 +38,10 @@ function create_lag(x, lag)
     return new
 end
 data_lag = create_lag(sample_data, 1)
+old_y = copy(data_lag)
+new_y = copy(sample_data)
+target_variable = Symbol("x_world.sa")
+target_period = Dates.Date(2020,6,1)
 
 
 @testset "Helper functions" begin
@@ -97,6 +101,18 @@ end
 	@test sum(output[:Vsmooth]) ≈ 872.1521836796258
 	@test sum(output[:VVsmooth]) ≈ 283.92273510769024
 	@test sum(output[:loglik]) ≈ 509.2892978152599
+
+	output_dfm = estimate_dfm(sample_data; blocks=blocks, p=p, max_iter=10, threshold=1e-5)
+	constparams = kalman_filter_constparams(y_tmp; output_dfm=output_dfm, lag=0)
+
+	@test sum(constparams[:Plag][1]) ≈ 97.58891907171578
+	@test sum(constparams[:X_smooth]) ≈ 14.04281014538804
+	@test sum(constparams[:Vsmooth]) ≈ 98.00373560282938
+	@test sum(constparams[:F]) ≈ 114.31015137657359
+
+	constparams = kalman_filter_constparams(y_tmp; output_dfm=output_dfm, lag=2)
+	@test sum(skipmissing(constparams[:Plag][2])) ≈ 31.4925876069849
+	@test sum(skipmissing(constparams[:Plag][3])) ≈ 29.398312508379988
 end
 
 @testset "EM" begin

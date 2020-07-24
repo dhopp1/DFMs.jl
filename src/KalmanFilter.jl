@@ -1,3 +1,5 @@
+include("HelperFunctions.jl")
+
 """
     This function applies a Kalman filter and fixed-interval smoother. The script uses the following model:
         y_t = C_t * Z_t + e_t, for e_t ~ N(0, R)
@@ -26,6 +28,7 @@
     returns: Dict
        Zsmooth => k-by-(nobs+1) matrix, smoothed factor estimates (i.e. Zsmooth[, t + 1] = Z_t|T)
        Vsmooth => k-by-k-by-(nobs+1) array, smoothed factor covariance matrices (i.e. Vsmooth[, , t + 1) = Cov(Z_t|T))
+       VmU => Filtered factor posterior covariance
        VVsmooth => k-by-k-by-nobs array, lag 1 factor covariance matrices (i.e. Cov(Z_t, Z_t-1|T))
        loglik => scalar, log-likelihood
 """
@@ -122,7 +125,62 @@ function kalman_filter(y_est, A, C, Q, R, Z0, V0)
     return Dict(
         :Zsmooth => ZmT,
         :Vsmooth => VmT,
+        :VmU => VmU,
         :VVsmooth => VmT_lag,
         :loglik => loglik
+    )
+end
+
+
+"""
+    This function applies a Kalman filter for news calculation step, when model parameters are already estimated. This procedure only smoothes and fills missing data for a given data matrix
+     parameters:
+        data : Array
+            input data matrix
+        output_dfm : Dict
+            output of estimate_dfm function
+        lag: Int
+            number of lags
+    returns: Dict
+        Plag => Smoothed factor covariance for transition matrix
+        Vsmooth => Smoothed factor covariance matrix
+        X_smooth => Smoothed data matrix
+        F => Smoothed factors
+"""
+function kalman_filter_constparams(data; output_dfm, lag)
+    # initialization
+    Z0 = output_dfm[:Z0]; V0 = output_dfm[:V0]; A = output_dfm[:A]; C = output_dfm[:C]; Q = output_dfm[:Q]; R = output_dfm[:R]; means = output_dfm[:means]; stds = output_dfm[:stds];
+    stds = output_dfm[:stds]
+    means = output_dfm[:means]
+    y = transpose(Array(standardize(data)))
+    # y = standardize(data) |> j-> j[[sum(.!ismissing.(Array(x))) > 0 for x in eachrow(j)], :] |> Array |> transpose # temporary, should I removing missing before here?
+    kalman_output = kalman_filter(y, A, C, Q, R, Z0, V0)
+
+    Vs = kalman_output[:Vsmooth][:,:,1:end-1] # Smoothed factor covariance for transition matrix
+    Vf = kalman_output[:VmU][:,:,1:end-1] # Filtered factor posterior covariance
+    Zsmooth = kalman_output[:Zsmooth] # Smoothed factors
+    Vsmooth = kalman_output[:Vsmooth] # Smoothed covariance value
+    Plag = []
+    push!(Plag, Vs)
+
+    if lag > 0
+        for jk in 1:lag
+            tmp_plag = Array{Union{Missing, Float64},3}(undef, size(C)[2], size(C)[2], size(y)[2])
+            for jt in size(Plag[1])[3]:-1:(lag + 1)
+                As = Vf[:,:, jt - jk] * transpose(A) * pinv(A * Vf[:,:,jt-jk] * transpose(A) + Q)
+                tmp_plag[:,:,jt] = As * Plag[jk][:,:,jt]
+            end
+            push!(Plag, tmp_plag)
+        end
+    end
+    Zsmooth = transpose(Zsmooth)
+    x_sm = Zsmooth[1:end-1,:] * transpose(C) # Factors to series representation
+    X_smooth = repeat(stds, size(y)[2]) .* x_sm .+ repeat(means, size(y)[2]) # standardized to unstandardized
+
+    return Dict(
+        :Plag => Plag,
+        :Vsmooth => Vsmooth,
+        :X_smooth => X_smooth,
+        :F => Zsmooth[1:end-1,:]
     )
 end
