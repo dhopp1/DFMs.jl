@@ -4,6 +4,7 @@ include("EM.jl")
 
 using DataFrames
 using Statistics
+using CSV
 
 
 """
@@ -36,7 +37,7 @@ using Statistics
         For example, we place an I4 matrix to account for matching (f_t-1; f_t-2; f_t-3; f_t-4) terms
       :Q => covariance for transition equation residuals
       :means =>  series mean
-      :sdevs => series standard deviation
+      :stds => series standard deviation
       :Z0 => initial value of state
       :V0 => initial value of covariance matrix
       :p => number of lags in transition equation
@@ -54,6 +55,7 @@ function estimate_dfm(Y; blocks, p, max_iter=5000, threshold=1e-5)
     # put all quarterly variables to the end
     y_tmp = [y_tmp[!, .!monthly_quarterly_array]  y_tmp[!, monthly_quarterly_array]]
     monthly_quarterly_array = gen_monthly_quarterly(dates, y_tmp)
+    nM = sum(.!monthly_quarterly_array)
 
     # calculate initial variables
     init_conds = initialize_conditions(y_tmp; dates=dates, p=p, blocks=blocks, R_mat=R_mat)
@@ -131,4 +133,46 @@ function estimate_dfm(Y; blocks, p, max_iter=5000, threshold=1e-5)
         :LL => LL[2:end]
     )
     return nowcast
+end
+
+"outputs an output_dfm dict to disk (path = foldername)"
+function export_dfm(;output_dfm::Dict, out_path::String)
+    DataFrame(output_dfm[:Xsmooth]) |> x-> CSV.write("$out_path/X_smooth.csv", x) # :X_smooth
+    DataFrame(output_dfm[:Z]) |> x-> CSV.write("$out_path/Z.csv", x) # :Z
+    DataFrame(output_dfm[:C]) |> x-> CSV.write("$out_path/C.csv", x) # :C
+    DataFrame(output_dfm[:R]) |> x-> CSV.write("$out_path/R.csv", x) # :R
+    DataFrame(output_dfm[:A]) |> x-> CSV.write("$out_path/A.csv", x) # :A
+    DataFrame(output_dfm[:Q]) |> x-> CSV.write("$out_path/Q.csv", x) # :Q
+    DataFrame(output_dfm[:means]) |> x-> CSV.write("$out_path/means.csv", x) # :means
+    DataFrame(output_dfm[:stds]) |> x-> CSV.write("$out_path/stds.csv", x) # :stds
+    DataFrame(Z0=output_dfm[:Z0]) |> x-> CSV.write("$out_path/Z0.csv", x) # :Z0
+    DataFrame(output_dfm[:V0]) |> x-> CSV.write("$out_path/V0.csv", x) # :V0
+    DataFrame(p=output_dfm[:p]) |> x-> CSV.write("$out_path/p.csv", x) # :p
+    DataFrame(num_iter=output_dfm[:num_iter]) |> x-> CSV.write("$out_path/num_iter.csv", x) # :num_iter
+    DataFrame(convergence=output_dfm[:convergence]) |> x-> CSV.write("$out_path/convergence.csv", x) # :convergence
+    DataFrame(loglik=output_dfm[:loglik]) |> x-> CSV.write("$out_path/loglik.csv", x) # :loglik
+    DataFrame(LL=output_dfm[:LL]) |> x-> CSV.write("$out_path/LL.csv", x) # :LL
+end
+
+
+"read an output_dfm directory to disk (folder name)"
+function import_dfm(;path::String)::Dict
+    tmp = Dict()
+    tmp[:Xsmooth] = CSV.read("$path/X_smooth.csv") |> Array # :X_smooth
+    tmp[:Z] = CSV.read("$path/Z.csv") |> Array # :Z
+    tmp[:C] = CSV.read("$path/C.csv") |> Array # :C
+    tmp[:R] = CSV.read("$path/R.csv") |> Array # :R
+    tmp[:A] = CSV.read("$path/A.csv") |> Array # :A
+    tmp[:Q] = CSV.read("$path/Q.csv") |> Array # :Q
+    tmp[:means] = CSV.read("$path/means.csv") |> Array # :means
+    tmp[:stds] = CSV.read("$path/stds.csv") |> Array # :stds
+    tmp[:Z0] = CSV.read("$path/Z0.csv") |> Array # :Z0
+    tmp[:V0] = CSV.read("$path/V0.csv") |> Array # :V0
+    tmp[:p] = CSV.read("$path/p.csv") |> x-> x[1,1] # :p
+    tmp[:num_iter] = CSV.read("$path/num_iter.csv") |> x-> x[1,1]  # :num_iter
+    tmp[:convergence] = CSV.read("$path/convergence.csv") |> x-> x[1,1] # :convergence
+    tmp[:loglik] = CSV.read("$path/loglik.csv") |> x-> x[1,1] # :loglik
+    tmp[:LL] = CSV.read("$path/LL.csv") |> x-> x[1,1] # :LL
+
+    return tmp
 end
