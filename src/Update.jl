@@ -210,14 +210,19 @@ end
             the target variable column name
         target_period : Dates.Date
             the date for which a forecast is desired
-    returns: DataFrame
-       series => the name of the variable
-       forecast => the forecast value for the desired time period
-       actual => the most recent actually observed value of the variable
-       weight => weight of each data release
-       impact_releases => impact of data releases on nowcast
-       impact_total => impact of data_release + data_revisions on nowcast
-       data_release => was this series released between the old and newer datasets
+    returns: Dict
+        :news_table : DataFrame
+           series => the name of the variable
+           forecast => the forecast value for the desired time period
+           actual => the most recent actually observed value of the variable
+           weight => weight of each data release
+           impact_releases => impact of data releases on nowcast
+           impact_total => impact of data_release + data_revisions on nowcast
+           data_release => was this series released between the old and newer datasets
+       :y_old : Float
+            previous prediction for y
+       :y_hat : Float
+            prediction for y from new data
 """
 function update_nowcast(;old_y::DataFrame, new_y::DataFrame, output_dfm::Dict, target_variable::Symbol, target_period::Dates.Date)
     # artificial lagged dataset if no old data given
@@ -275,5 +280,9 @@ function update_nowcast(;old_y::DataFrame, new_y::DataFrame, output_dfm::Dict, t
         .!ismissing.(new_y[new_y[!, date_col_name(new_y)] .== target_period, Not(date_col_name(new_y))]) |> Array |> x-> reshape(x, size(x)[2])
     news_table[!, :data_release] = data_released
 
-    return news_table
+    return Dict(
+        :news_table => news_table,
+        :y_old => y_old,
+        :y_new => y_new
+    )
 end

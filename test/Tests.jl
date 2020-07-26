@@ -164,7 +164,7 @@ end
 	@test sum(news[:y_old]) ≈ 0.010865864832867203
 	@test sum(news[:y_new]) ≈ -0.01335101140300618
 
-	updated_nowcast = update_nowcast(;old_y=create_lag(new_y, 1), new_y=new_y, output_dfm=output_dfm, target_variable=Symbol("x_world.sa"), target_period=Dates.Date(2020,6,1))
+	updated_nowcast = update_nowcast(;old_y=create_lag(new_y, 1), new_y=new_y, output_dfm=output_dfm, target_variable=Symbol("x_world.sa"), target_period=Dates.Date(2020,6,1))[:news_table]
 
 	@test sum(skipmissing(updated_nowcast[!, :forecast])) ≈ -79.34991526023686
 	@test sum(skipmissing(updated_nowcast[!, :actual])) ≈ -60.80187052009832
