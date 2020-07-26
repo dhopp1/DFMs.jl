@@ -90,33 +90,33 @@ end
 @testset "Kalman filter" begin
 	output = kalman_filter(y_est, A, C, Q, R, Z0, V0)
 
-	@test sum(output[:Zsmooth]) ≈ 16.9734395062919
-	@test sum(output[:Vsmooth]) ≈ 872.1521836796258
-	@test sum(output[:VVsmooth]) ≈ 283.92273510769024
-	@test sum(output[:loglik]) ≈ 509.2892978152599
+	@test sum(output[:Zsmooth]) ≈ 17.108467354695524
+	@test sum(output[:Vsmooth]) ≈ 808.0226237078814
+	@test sum(output[:VVsmooth]) ≈ 232.87470774743034
+	@test sum(output[:loglik]) ≈ 541.3938089668698
 
 	output_dfm = estimate_dfm(sample_data; blocks=blocks, p=p, max_iter=10, threshold=1e-5)
 	constparams = kalman_filter_constparams(y_tmp; output_dfm=output_dfm, lag=0)
 
-	@test sum(constparams[:Plag][1]) ≈ 97.58891907171578
-	@test sum(constparams[:X_smooth]) ≈ 14.04281014538804
-	@test sum(constparams[:Vsmooth]) ≈ 98.00373560282938
-	@test sum(constparams[:F]) ≈ 114.31015137657359
+	@test sum(constparams[:Plag][1]) ≈ 79.91396625742085
+	@test sum(constparams[:X_smooth]) ≈ 14.352390345012175
+	@test sum(constparams[:Vsmooth]) ≈ 80.02804204917477
+	@test sum(constparams[:F]) ≈ 109.36315084230503
 
 	constparams = kalman_filter_constparams(y_tmp; output_dfm=output_dfm, lag=2)
-	@test sum(skipmissing(constparams[:Plag][2])) ≈ 31.4925876069849
-	@test sum(skipmissing(constparams[:Plag][3])) ≈ 29.398312508379988
+	@test sum(skipmissing(constparams[:Plag][2])) ≈ 22.067361604719792
+	@test sum(skipmissing(constparams[:Plag][3])) ≈ 23.35769893782239
 end
 
 @testset "EM" begin
 	em_output = EM_step(y_est; A=A, C=C, Q=Q, R=R, Z0=Z0, V0=V0, p=p, blocks=blocks, R_mat=R_mat, q=q, nM=nM, monthly_quarterly_array=monthly_quarterly_array)
 
-	@test sum(em_output[:A_new]) ≈ 11.6799558151333
-	@test sum(em_output[:C_new]) ≈ 22.349648436221734
-	@test sum(em_output[:Q_new]) ≈ 1.6498771441810458
+	@test sum(em_output[:A_new]) ≈ 11.552663255407325
+	@test sum(em_output[:C_new]) ≈ 23.45337243218924
+	@test sum(em_output[:Q_new]) ≈ 1.594071735564734
 	@test sum(em_output[:Z0]) ≈ 0.031060939148336537
-	@test sum(em_output[:V0]) ≈ 49.20972973859572
-	@test sum(em_output[:loglik]) ≈ 509.2892978152599
+	@test sum(em_output[:V0]) ≈ 48.99573305597052
+	@test sum(em_output[:loglik]) ≈ 541.3938089668698
 
 	loglik = 10; prev_loglik = 1e-6;
 	converged, decrease = values(EM_convergence(loglik, prev_loglik, 1e-5))
@@ -137,17 +137,17 @@ end
 @testset "EstimateDFM" begin
 	output = estimate_dfm(sample_data; blocks=blocks, p=p, max_iter=10, threshold=1e-5)
 
-	@test sum(output[:Xsmooth_std]) ≈ 10.511990707459224
-	@test sum(output[:C]) ≈ 21.979826198523067
+	@test sum(output[:Xsmooth_std]) ≈ 10.808521737527098
+	@test sum(output[:C]) ≈ 23.099766843345556
 	@test sum(output[:R]) ≈ 0.0011
-	@test sum(output[:A]) ≈ 12.768581356259535
-	@test sum(output[:Q]) ≈ 0.15526910701420402
+	@test sum(output[:A]) ≈ 12.745531615217024
+	@test sum(output[:Q]) ≈ 0.10217159203541483
 	@test sum(output[:means]) ≈ 0.060732284509809845
 	@test sum(output[:stds]) ≈ 0.5829554656784255
-	@test sum(output[:Z0]) ≈ 0.7554301411482052
-	@test sum(output[:V0]) ≈ 49.20972973859572
-	@test sum(output[:loglik]) ≈ 6414.119209820474
-	@test sum(output[:LL]) ≈ 53946.7817953308
+	@test sum(output[:Z0]) ≈ 0.7589260732889963
+	@test sum(output[:V0]) ≈ 48.99573305597052
+	@test sum(output[:loglik]) ≈ 6544.007956191773
+	@test sum(output[:LL]) ≈ 54935.04005844516
 end
 
 @testset "Update" begin
@@ -155,21 +155,21 @@ end
 	news = news_dfm(;old_y=data_lag, new_y=sample_data, output_dfm=output_dfm, target_variable=Symbol("x_world.sa"), target_period=Dates.Date(2020,6,1))
 
 	@test sum(news[:actual]) ≈ -0.6080187052009832
-	@test sum(news[:forecast]) ≈ -0.7934991526023685
-	@test sum(news[:weight]) ≈ 0.3377434672020498
-	@test sum(news[:innov]) ≈ 15.119737715315845
+	@test sum(news[:forecast]) ≈ -0.8269307754720284
+	@test sum(news[:weight]) ≈ 1.9326984705441284
+	@test sum(news[:innov]) ≈ 15.778245847006348
 	@test sum(news[:row_miss]) ≈ 2427
 	@test sum(news[:col_miss]) ≈ 66
-	@test sum(news[:singlenews]) ≈ -0.013155651969646982
-	@test sum(news[:y_old]) ≈ 0.010865864832867203
-	@test sum(news[:y_new]) ≈ -0.01335101140300618
+	@test sum(news[:singlenews]) ≈ 0.04320382154267746
+	@test sum(news[:y_old]) ≈ -0.3871829288269627
+	@test sum(news[:y_new]) ≈ -0.33385843789784786
 
 	updated_nowcast = update_nowcast(;old_y=create_lag(new_y, 1), new_y=new_y, output_dfm=output_dfm, target_variable=Symbol("x_world.sa"), target_period=Dates.Date(2020,6,1))[:news_table]
 
-	@test sum(skipmissing(updated_nowcast[!, :forecast])) ≈ -79.34991526023686
+	@test sum(skipmissing(updated_nowcast[!, :forecast])) ≈ -82.69307754720283
 	@test sum(skipmissing(updated_nowcast[!, :actual])) ≈ -60.80187052009832
-	@test sum(skipmissing(updated_nowcast[!, :weight])) ≈ 0.3377434672020498
-	@test sum(skipmissing(updated_nowcast[!, :impact_releases])) ≈ -1.3155651969646984
-	@test sum(skipmissing(updated_nowcast[!, :impact_total])) ≈ -1.3155651969646984
+	@test sum(skipmissing(updated_nowcast[!, :weight])) ≈ 1.9326984705441284
+	@test sum(skipmissing(updated_nowcast[!, :impact_releases])) ≈ 4.3203821542677465
+	@test sum(skipmissing(updated_nowcast[!, :impact_total])) ≈ 4.3203821542677465
 	@test sum(skipmissing(updated_nowcast[!, :data_release])) ≈ 2
 end

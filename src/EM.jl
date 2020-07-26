@@ -203,7 +203,7 @@ function EM_step(y_est; A, C, Q, R, Z0, V0, p, blocks, R_mat, q, nM, monthly_qua
             for t in 1:n_obs
                 Wt = diagm(.!ismissing.(y_est)[j:j,t]) * 1 # Selection matrix for quarterly values, double check this used to be indx_iQ, had to change to work with multiple quarterly variables.
                 # Intermediate steps in BGR equation 13
-                bl_idxQ_ext = vcat(bl_idxQ[i,:], repeat([false], size(Zsmooth)[1] - size(bl_idxQ)[2]))
+                global bl_idxQ_ext = vcat(bl_idxQ[i,:], repeat([false], size(Zsmooth)[1] - size(bl_idxQ)[2]))
                 denom = denom + kron(Zsmooth[bl_idxQ_ext, t + 1] * transpose(Zsmooth[bl_idxQ_ext, t + 1]) +  Vsmooth[bl_idxQ_ext, bl_idxQ_ext, t + 1], Wt)
                 nom = nom + y[j,t] * transpose(Zsmooth[bl_idxQ_ext, t + 1])
                 nom = nom - Wt * ([1 2 3 2 1] * Zsmooth[index_freq_jQ, t + 1] * transpose(Zsmooth[bl_idxQ_ext, t + 1]) + [1 2 3 2 1] * Vsmooth[index_freq_jQ, bl_idxQ_ext, t + 1])
