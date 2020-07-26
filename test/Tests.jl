@@ -30,14 +30,6 @@ y_est = y_tmp[[sum(.!ismissing.(Array(x))) > 0 for x in eachrow(y_tmp)], :] |> A
 nM = sum(.!monthly_quarterly_array)
 
 # creating an artificial lagged dataset
-function create_lag(x, lag)
-    new = copy(x)
-    for i in 2:ncol(x)
-        last_data_index = findall(!ismissing, x[!, i])[end]
-        new[(last_data_index-lag+1):last_data_index, i] .= missing
-    end
-    return new
-end
 data_lag = create_lag(sample_data, 1)
 old_y = copy(data_lag)
 new_y = copy(sample_data)
@@ -171,4 +163,13 @@ end
 	@test sum(news[:singlenews]) ≈ -0.013155651969646982
 	@test sum(news[:y_old]) ≈ 0.010865864832867203
 	@test sum(news[:y_new]) ≈ -0.01335101140300618
+
+	updated_nowcast = update_nowcast(;old_y=create_lag(new_y, 1), new_y=new_y, output_dfm=output_dfm, target_variable=Symbol("x_world.sa"), target_period=Dates.Date(2020,6,1))
+
+	@test sum(skipmissing(updated_nowcast[!, :forecast])) ≈ -79.34991526023686
+	@test sum(skipmissing(updated_nowcast[!, :actual])) ≈ -60.80187052009832
+	@test sum(skipmissing(updated_nowcast[!, :weight])) ≈ 0.3377434672020498
+	@test sum(skipmissing(updated_nowcast[!, :impact_releases])) ≈ -1.3155651969646984
+	@test sum(skipmissing(updated_nowcast[!, :impact_total])) ≈ -1.3155651969646984
+	@test sum(skipmissing(updated_nowcast[!, :data_release])) ≈ 2
 end

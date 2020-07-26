@@ -57,7 +57,7 @@ function news_dfm(;old_y, new_y, output_dfm, target_variable, target_period)
             y_new[1,i] = data_new[target_period_index, target_index[i]]
         end
         # Forecast-related output set to empty
-        actual = missing; forecast = missing; weight = missing; t_miss = missing; v_miss = missing; innov = missing;
+        actual = missing; forecast = missing; weight = missing; t_miss = missing; v_miss = missing; innov = missing; row_miss = missing; col_miss = missing;
     else # yes forecast case, steps A and B
         # Initialize series mean/standard deviation
         means = output_dfm[:means]
@@ -84,7 +84,7 @@ function news_dfm(;old_y, new_y, output_dfm, target_variable, target_period)
             # No news, so nothing returned for news-related output
             groupnews = missing; singlenews = missing; gain = missing; gainSer = missing;
             actual = missing; forecast = missing; weight = missing; t_miss = missing; v_miss = missing; innov = missing
-        # Forecast subcase (b): new informatoin
+        # Forecast subcase (b): new information
         else
             # Difference between forecast time and new data time
             lag = target_period_index .- row_miss
@@ -198,12 +198,82 @@ end
 
 
 """
-    tmp
+    This function calculates the DFM nowcast estimates at a current data vintage and compare it with the results from a previous data vintage (pass the same dataset for old_y and new_y to generate an artifical 1-month lagged dataset). The changes are classified as data revisions and data releases, and their impact on the nowcast estimate is presented separately.
      parameters:
-        tmp : Array
-            tmp
-    returns: Dict
-       tmp
+        old_y : DataFrame
+            DataFrame of older data, including date column
+        new_y : DataFrame of newer data
+            DataFrame of newest data, including date column
+        output_dfm : Dict
+            Output/parameters of the estimate_dfm function. No model estimation happens here, this compares new data revisions with pre-estimated parameters.
+        target_variable : Symbol
+            the target variable column name
+        target_period : Dates.Date
+            the date for which a forecast is desired
+    returns: DataFrame
+       series => the name of the variable
+       forecast => the forecast value for the desired time period
+       actual => the most recent actually observed value of the variable
+       weight => weight of each data release
+       impact_releases => impact of data releases on nowcast
+       impact_total => impact of data_release + data_revisions on nowcast
+       data_release => was this series released between the old and newer datasets
 """
-function update_nowcast()
+function update_nowcast(;old_y::DataFrame, new_y::DataFrame, output_dfm::Dict, target_variable::Symbol, target_period::Dates.Date)
+    # artificial lagged dataset if no old data given
+    if isequal(old_y, new_y)
+        old_y = create_lag(new_y, 1)
+    end
+    # making sure old data has same number of rows/dates as new data
+    old_y = join(DataFrame(date=new_y[!, date_col_name(new_y)]), old_y, on=Pair(:date, date_col_name(old_y)), kind=:left)
+
+    # add 12 months to each dataset to allow for forecasting
+    months_ahead = 12
+    last_date = new_y[end, :date]
+    row = DataFrame(eachrow(new_y)[1:months_ahead])
+    row[!, Not(date_col_name(new_y))] .= missing
+    old_y = vcat(old_y, row)
+    new_y = vcat(new_y, row)
+    old_y[end-months_ahead+1:end, :date] = new_y[end-months_ahead+1:end, :date] = [last_date + Month(i) for i in 1:months_ahead]
+
+    # Update nowcast for target variable 'series' (i) at horizon 'target' (t)
+    # Relate nowcast update into news from data releases:
+    #   a. Compute the impact from data revisions
+    #   b. Compute the impact from new data releases
+    data_rev = copy(new_y)
+    old_missing = ismissing.(old_y)
+    for i in 1:ncol(old_y)
+        if eltype(data_rev[!, i]) != Dates.Date
+            data_rev[old_missing[!, i], i] .= missing
+        end
+    end
+
+    # Compute impact from data revisions
+    results_old = news_dfm(;old_y=old_y, new_y=data_rev, output_dfm=output_dfm, target_variable=target_variable, target_period=target_period)
+    y_old = results_old[:y_old]; old_forecast = results_old[:forecast]
+
+    # Compute impact from data releases
+    results_new = news_dfm(;old_y=data_rev, new_y=new_y, output_dfm=output_dfm, target_variable=target_variable, target_period=target_period)
+    y_rev = results_new[:y_old]; y_new = results_new[:y_new];
+    actual = results_new[:actual]; forecast = results_new[:forecast]; weight = results_new[:weight]
+
+    impact_revisions = y_rev - y_old # Impact from revisions
+    news = actual .- forecast # News from releases
+    impact_releases = weight[:,:,1] .* news # Impact of releases
+
+    news_table = DataFrame(
+        forecast=forecast[:,1],
+        actual=actual[:,1],
+        weight=weight[:,1],
+        impact_releases=impact_releases[:,1],
+        impact_total=impact_releases[:,1] .+ impact_revisions
+    )
+    news_table = DataFrame(Array(news_table) * diagm([100,100,1,100, 100])) |> x-> rename!(x, names(news_table))
+    news_table[!, :series] = names(new_y) |> x-> x[.!occursin.(string.(x), String(date_col_name(new_y)))] .|> string
+    news_table = news_table[!, [:series; names(news_table)[1:end-1]]]
+    data_released = ismissing.(old_y[old_y[!, date_col_name(old_y)] .== target_period, Not(date_col_name(old_y))]) .& # data newly released between two datasets
+        .!ismissing.(new_y[new_y[!, date_col_name(new_y)] .== target_period, Not(date_col_name(new_y))]) |> Array |> x-> reshape(x, size(x)[2])
+    news_table[!, :data_release] = data_released
+
+    return news_table
 end

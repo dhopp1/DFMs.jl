@@ -152,3 +152,23 @@ function date_col_name(df::DataFrame)
         println("No column of type Dates.Date")
     end
 end
+
+
+"""
+    given a dataframe, create a lagged dataframe where lag months back will be set to missing
+    parameters:
+        x : DataFrame
+            dataframe to be artificially lagged
+        lag : Int
+            number of months to lag dataframe by
+    returns: DataFrame
+        lagged dataframe
+"""
+function create_lag(x, lag)
+    new = copy(x)
+    for i in 2:ncol(x)
+        last_data_index = findall(!ismissing, x[!, i])[end]
+        new[(last_data_index-lag+1):last_data_index, i] .= missing
+    end
+    return new
+end
