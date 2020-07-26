@@ -149,7 +149,7 @@ function EM_step(y_est; A, C, Q, R, Z0, V0, p, blocks, R_mat, q, nM, monthly_qua
 
     for i in 1:n_bl # Loop through unique loadings
         bl_i = bl[i,:]
-        rs = sum(bl_i) # Total num of blocks loaded
+        rs = sum(bl_i) # Total num of blocks loaded, or number of quarterly variables?
         idx_i = findall(x->x == true, [x == bl_i for x in eachrow(blocks)]) # Indices for bl_i (which variables in block)
         idx_iM = idx_i[idx_i .<= nM] # Only monthly series
         n_i = length(idx_iM) # Number of monthly series
@@ -186,7 +186,7 @@ function EM_step(y_est; A, C, Q, R, Z0, V0, p, blocks, R_mat, q, nM, monthly_qua
         R_con_i = R_con_i[no_c,:]
         q_con_i = q_con_i[no_c,:]
 
-        # Loop through quarterly series in loading, this parallels monthly code
+        # Loop through quarterly series in loading, this parallels monthly code. This has to be checked for working with multiple quarterly variables.
         for j in idx_iQ
             # Initialization
             denom = zeros(Int(rps), Int(rps))
@@ -194,13 +194,14 @@ function EM_step(y_est; A, C, Q, R, Z0, V0, p, blocks, R_mat, q, nM, monthly_qua
             idx_jQ = j - nM # Ordinal position of quarterly variable
             # Location of factor structure corresponding to quarterly variable residuals
             index_freq_jQ = (rp1 + n_index_M + 5 * (idx_jQ - 1) + 1):(rp1 + n_index_M + 5 * idx_jQ)
+
             # Place quarterly values in output matrix
             V0_new[index_freq_jQ, index_freq_jQ] = Vsmooth[index_freq_jQ, index_freq_jQ, 1]
             A_new[index_freq_jQ[1], index_freq_jQ[1]] = Ai[index_freq_jQ[1] - rp1, index_freq_jQ[1] - rp1]
             Q_new[index_freq_jQ[1], index_freq_jQ[1]] = Qi[index_freq_jQ[1] - rp1, index_freq_jQ[1] - rp1]
             # Update quarterly variables: loop through each period
             for t in 1:n_obs
-                Wt = diagm(.!ismissing.(y_est)[idx_iQ,t]) .* 1.0 # Selection matrix for quarterly values
+                Wt = diagm(.!ismissing.(y_est)[j:j,t]) * 1 # Selection matrix for quarterly values, double check this used to be indx_iQ, had to change to work with multiple quarterly variables.
                 # Intermediate steps in BGR equation 13
                 bl_idxQ_ext = vcat(bl_idxQ[i,:], repeat([false], size(Zsmooth)[1] - size(bl_idxQ)[2]))
                 denom = denom + kron(Zsmooth[bl_idxQ_ext, t + 1] * transpose(Zsmooth[bl_idxQ_ext, t + 1]) +  Vsmooth[bl_idxQ_ext, bl_idxQ_ext, t + 1], Wt)

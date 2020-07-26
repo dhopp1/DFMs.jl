@@ -23,7 +23,7 @@ q = zeros(4)
 p = 1
 monthly_quarterly_array = gen_monthly_quarterly(dates, y_tmp)
 R_mat = [2 -1 0 0 0; 3 0 -1 0 0; 2 0 0 -1 0; 1 0 0 0 -1]
-blocks = DataFrame(a=ones(size(y_tmp)[2]-1), b=ones(size(y_tmp)[2]-1))
+blocks = DataFrame(a=ones(size(y_tmp)[2]), b=ones(size(y_tmp)[2]))
 init_conds = initialize_conditions(y_tmp; dates=dates, p=1, blocks=blocks, R_mat=R_mat)
 A = init_conds[:A]; C = init_conds[:C]; Q = init_conds[:Q]; R = init_conds[:R]; Z0 = init_conds[:Z0]; V0 = init_conds[:V0]
 y_est = y_tmp[[sum(.!ismissing.(Array(x))) > 0 for x in eachrow(y_tmp)], :] |> Array |> transpose
