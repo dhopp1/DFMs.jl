@@ -16,7 +16,7 @@ using CSV
 
 
 # data set up
-sample_data = CSV.read("test_data.csv") |> DataFrame
+sample_data = CSV.File("test_data.csv") |> DataFrame!
 y_tmp = sample_data[!, Not(:date)]
 dates = sample_data[!, :date]
 q = zeros(4)
@@ -175,4 +175,19 @@ end
 	@test sum(skipmissing(updated_nowcast[!, :impact_releases])) ≈ 4.3203821542677465
 	@test sum(skipmissing(updated_nowcast[!, :impact_total])) ≈ 4.3203821542677465
 	@test sum(skipmissing(updated_nowcast[!, :data_release])) ≈ 2
+end
+
+@testset "Full functionality" begin
+	calc  = estimate_dfm(sample_data; blocks=blocks, p=1, max_iter=100, threshold=1e-5)
+	export_dfm(output_dfm=calc, out_path="output")
+	imported  = import_dfm(path="output")
+
+	predcalc = predict_dfm(sample_data; output_dfm=calc, months_ahead=3, lag=0)
+	@test sum([sum(i) for i in eachcol(predcalc)[2:end]]) ≈ 15.531695602544705
+
+	predimported = predict_dfm(sample_data; output_dfm=imported, months_ahead=3, lag=0)
+	@test sum([sum(i) for i in eachcol(predimported)[2:end]]) ≈ 15.531695602544705
+
+	news = gen_news(old_y=sample_data, new_y=sample_data, output_dfm=imported, target_variable=Symbol("x_world.sa"), target_period=Dates.Date(2020,6,1))
+	@test sum([sum(i) for i in eachcol(news[:news_table])[2:end]]) ≈ -136.49942413496785
 end

@@ -35,9 +35,9 @@ function news_dfm(;old_y, new_y, output_dfm, target_variable, target_period)
     data_old = old_y[!, Not(old_date_col)]
     data_new = new_y[!, Not(new_date_col)]
     # making sure old data has same number of rows/dates as new data
-    old_y = join(DataFrame(date=new_dates), old_y, on=Pair(:date, old_date_col), kind=:left)
+    old_y = leftjoin(DataFrame(date=new_y[!, date_col_name(new_y)]), old_y, on=:date=>date_col_name(old_y))
     data_old = old_y[!, Not(:date)]
-    target_index = findall(x-> x == target_variable, names(data_new))
+    target_index = findall(x-> x == target_variable, Symbol.(names(data_new)))
     target_old = target_new = zeros(1,length(target_index))
     target_period_index = findall(x-> x==target_period, new_dates)[1]
 
@@ -232,7 +232,7 @@ function gen_news(;old_y::DataFrame, new_y::DataFrame, output_dfm::Dict, target_
         old_y = create_lag(new_y, 1)
     end
     # making sure old data has same number of rows/dates as new data
-    old_y = join(DataFrame(date=new_y[!, date_col_name(new_y)]), old_y, on=Pair(:date, date_col_name(old_y)), kind=:left)
+    old_y = leftjoin(DataFrame(date=new_y[!, date_col_name(new_y)]), old_y, on=:date=>date_col_name(old_y))
 
     # add 12 months to each dataset to allow for forecasting
     months_ahead = 12
@@ -277,7 +277,7 @@ function gen_news(;old_y::DataFrame, new_y::DataFrame, output_dfm::Dict, target_
     )
     news_table = DataFrame(Array(news_table) * diagm([100,100,1,100, 100])) |> x-> rename!(x, names(news_table))
     news_table[!, :series] = names(new_y) |> x-> x[.!occursin.(string.(x), String(date_col_name(new_y)))] .|> string
-    news_table = news_table[!, [:series; names(news_table)[1:end-1]]]
+    news_table = news_table[!, [:series; Symbol.(names(news_table)[1:end-1])]]
     data_released = ismissing.(old_y[old_y[!, date_col_name(old_y)] .== target_period, Not(date_col_name(old_y))]) .& # data newly released between two datasets
         .!ismissing.(new_y[new_y[!, date_col_name(new_y)] .== target_period, Not(date_col_name(new_y))]) |> Array |> x-> reshape(x, size(x)[2])
     news_table[!, :data_release] = data_released

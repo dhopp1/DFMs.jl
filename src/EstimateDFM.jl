@@ -164,22 +164,22 @@ end
 "read an output_dfm directory to disk (folder name)"
 function import_dfm(;path::String)::Dict
     tmp = Dict()
-    tmp[:Xsmooth] = CSV.read("$path/X_smooth.csv") |> Array # :X_smooth
-    tmp[:Xsmooth_std] = CSV.read("$path/Xsmooth_std.csv") |> Array # :Xsmooth_std
-    tmp[:Z] = CSV.read("$path/Z.csv") |> Array # :Z
-    tmp[:C] = CSV.read("$path/C.csv") |> Array # :C
-    tmp[:R] = CSV.read("$path/R.csv") |> Array # :R
-    tmp[:A] = CSV.read("$path/A.csv") |> Array # :A
-    tmp[:Q] = CSV.read("$path/Q.csv") |> Array # :Q
-    tmp[:means] = CSV.read("$path/means.csv") |> Array # :means
-    tmp[:stds] = CSV.read("$path/stds.csv") |> Array # :stds
-    tmp[:Z0] = CSV.read("$path/Z0.csv") |> Array # :Z0
-    tmp[:V0] = CSV.read("$path/V0.csv") |> Array # :V0
-    tmp[:p] = CSV.read("$path/p.csv") |> x-> x[1,1] # :p
-    tmp[:num_iter] = CSV.read("$path/num_iter.csv") |> x-> x[1,1]  # :num_iter
-    tmp[:convergence] = CSV.read("$path/convergence.csv") |> x-> x[1,1] # :convergence
-    tmp[:loglik] = CSV.read("$path/loglik.csv") |> x-> x[1,1] # :loglik
-    tmp[:LL] = CSV.read("$path/LL.csv") |> x-> x[1,1] # :LL
+    tmp[:Xsmooth] = CSV.File("$path/X_smooth.csv") |> DataFrame!  |> Array # :X_smooth
+    tmp[:Xsmooth_std] = CSV.File("$path/Xsmooth_std.csv") |> DataFrame!  |> Array # :Xsmooth_std
+    tmp[:Z] = CSV.File("$path/Z.csv") |> DataFrame!  |> Array # :Z
+    tmp[:C] = CSV.File("$path/C.csv") |> DataFrame!  |> Array # :C
+    tmp[:R] = CSV.File("$path/R.csv") |> DataFrame!  |> Array # :R
+    tmp[:A] = CSV.File("$path/A.csv") |> DataFrame!  |> Array # :A
+    tmp[:Q] = CSV.File("$path/Q.csv") |> DataFrame!  |> Array # :Q
+    tmp[:means] = CSV.File("$path/means.csv") |> DataFrame!  |> Array # :means
+    tmp[:stds] = CSV.File("$path/stds.csv") |> DataFrame!  |> Array # :stds
+    tmp[:Z0] = CSV.File("$path/Z0.csv") |> DataFrame! |> Array |> x-> reshape(x, size(x)[1]) # :Z0
+    tmp[:V0] = CSV.File("$path/V0.csv") |> DataFrame! |> Array # :V0
+    tmp[:p] = CSV.File("$path/p.csv") |> DataFrame!  |> x-> x[1,1] # :p
+    tmp[:num_iter] = CSV.File("$path/num_iter.csv") |> DataFrame!  |> x-> x[1,1]  # :num_iter
+    tmp[:convergence] = CSV.File("$path/convergence.csv") |> DataFrame!  |> x-> x[1,1] # :convergence
+    tmp[:loglik] = CSV.File("$path/loglik.csv") |> DataFrame!  |> x-> x[1,1] # :loglik
+    tmp[:LL] = CSV.File("$path/LL.csv") |> DataFrame! |> Array # :LL
 
     return tmp
 end
