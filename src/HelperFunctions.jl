@@ -147,7 +147,7 @@ end
 function date_col_name(df::DataFrame)
     try
         return findall(x->x==Dates.Date, eltype.(eachcol(df)))[1] |> i->
-            names(df)[i]
+            Symbol(names(df)[i])
     catch e
         println("No column of type Dates.Date")
     end

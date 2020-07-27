@@ -143,6 +143,7 @@ end
 "outputs an output_dfm dict to disk (path = foldername)"
 function export_dfm(;output_dfm::Dict, out_path::String)
     DataFrame(output_dfm[:Xsmooth]) |> x-> CSV.write("$out_path/X_smooth.csv", x) # :X_smooth
+    DataFrame(output_dfm[:Xsmooth_std]) |> x-> CSV.write("$out_path/Xsmooth_std.csv", x) # :Xsmooth_std
     DataFrame(output_dfm[:Z]) |> x-> CSV.write("$out_path/Z.csv", x) # :Z
     DataFrame(output_dfm[:C]) |> x-> CSV.write("$out_path/C.csv", x) # :C
     DataFrame(output_dfm[:R]) |> x-> CSV.write("$out_path/R.csv", x) # :R
@@ -164,6 +165,7 @@ end
 function import_dfm(;path::String)::Dict
     tmp = Dict()
     tmp[:Xsmooth] = CSV.read("$path/X_smooth.csv") |> Array # :X_smooth
+    tmp[:Xsmooth_std] = CSV.read("$path/Xsmooth_std.csv") |> Array # :Xsmooth_std
     tmp[:Z] = CSV.read("$path/Z.csv") |> Array # :Z
     tmp[:C] = CSV.read("$path/C.csv") |> Array # :C
     tmp[:R] = CSV.read("$path/R.csv") |> Array # :R
@@ -213,7 +215,7 @@ function predict_dfm(data::DataFrame; output_dfm, months_ahead::Int, lag=0)
 
     predictions = kalman_filter_constparams(Y; output_dfm=output_dfm, lag=lag)[:X_smooth] |> DataFrame
     predictions[!, :date] = dates
-    predictions =  predictions[!, [:date; names(predictions)[1:end-1]]]
+    predictions =  predictions[!, [:date; Symbol.(names(predictions)[1:end-1])]]
     rename!(predictions, names(data))
     return predictions
 end
