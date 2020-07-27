@@ -1,6 +1,13 @@
 # DFMs.jl
 Dynamic factor models for Julia. Adapted from [Bok et al. 2017](https://www.newyorkfed.org/medialibrary/media/research/staff_reports/sr830.pdf), [code](https://github.com/FRBNY-TimeSeriesAnalysis/Nowcasting).
 
+## Installation
+```julia
+using Pkg
+Pkg.add(PackageSpec(url="https://github.com/dhopp1/DFMs.jl"))
+using DFMs
+```
+
 ## Usage
 
 ### Estimate a new model

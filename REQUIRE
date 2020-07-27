@@ -1,5 +1,10 @@
 julia 1.0
-DataFrames
-Statistics
+CSV
 CubicSplines
+DataFrames
+Dates
 DSP
+LinearAlgebra
+SparseArrays
+Statistics
+Suppressor
