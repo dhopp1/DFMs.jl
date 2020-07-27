@@ -148,6 +148,9 @@ end
 	@test sum(output[:V0]) ≈ 48.99573305597052
 	@test sum(output[:loglik]) ≈ 6544.007956191773
 	@test sum(output[:LL]) ≈ 54935.04005844516
+
+	predictions = predict_dfm(sample_data; output_dfm=output, months_ahead=3, lag=0)
+	@test sum([sum(i) for i in eachcol(predictions)[2:end]]) ≈ 14.124786767120007
 end
 
 @testset "Update" begin

@@ -3,6 +3,7 @@ include("InitialConditions.jl")
 include("EM.jl")
 
 using DataFrames
+using Dates
 using Statistics
 using CSV
 
@@ -175,4 +176,40 @@ function import_dfm(;path::String)::Dict
     tmp[:LL] = CSV.read("$path/LL.csv") |> x-> x[1,1] # :LL
 
     return tmp
+end
+
+
+"""
+    get predictions from an already estimated DFM model for all series, all periods.
+    parameters:
+        data : DataFrame
+            dataframe to generate predictions. Must include a date column, must contain the same columns the output_dfm was trained on.
+        output_dfm : Dict
+            output dictionary of the estimate_dfm function
+        months_ahead : Int
+            number of months ahead to forecast
+        lag : Int
+            number of lags for the kalman filter
+    returns: DataFrame
+      dataframe with all missing values filled + predictions
+"""
+function predict_dfm(data::DataFrame; output_dfm, months_ahead::Int, lag=0)
+    date_col = date_col_name(data)
+    Y = copy(data[!, Not(date_col)])
+    dates = copy(data[!, date_col])
+
+    # add months
+    last_date = data[end, date_col]
+    row = DataFrame(eachrow(Y)[1:months_ahead])
+    row .= missing
+    Y = vcat(Y, row)
+    for i in 1:months_ahead
+        push!(dates, last_date + Month(i))
+    end
+
+    predictions = kalman_filter_constparams(Y; output_dfm=output_dfm, lag=lag)[:X_smooth] |> DataFrame
+    predictions[!, :date] = dates
+    predictions =  predictions[!, [:date; names(predictions)[1:end-1]]]
+    rename!(predictions, names(data))
+    return predictions
 end
