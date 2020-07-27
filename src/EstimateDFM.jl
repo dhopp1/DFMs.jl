@@ -7,6 +7,10 @@ using Dates
 using Statistics
 using CSV
 
+export estimate_dfm
+export export_dfm
+export import_dfm
+export predict_dfm
 
 """
     estimate a dynamic factor model.

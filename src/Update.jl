@@ -1,5 +1,7 @@
 include("HelperFunctions.jl")
 
+export gen_news
+
 """
     This function calculates changes in news by using a given DFM results  structure. It inputs two datasets, DFM parameters, target time index, and target variable index. The function then produces Nowcast updates and decomposes the changes into news.
      parameters:
