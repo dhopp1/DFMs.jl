@@ -224,7 +224,7 @@ end
        :y_hat : Float
             prediction for y from new data
 """
-function update_nowcast(;old_y::DataFrame, new_y::DataFrame, output_dfm::Dict, target_variable::Symbol, target_period::Dates.Date)
+function gen_news(;old_y::DataFrame, new_y::DataFrame, output_dfm::Dict, target_variable::Symbol, target_period::Dates.Date)
     # artificial lagged dataset if no old data given
     if isequal(old_y, new_y)
         old_y = create_lag(new_y, 1)
