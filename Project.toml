@@ -1,4 +1,4 @@
-name = "DFMs.jl"
+name = "DFMs"
 uuid = "51bb8ac4-c740-11ea-29fc-db8aeaca0f58"
 author = ["Daniel Hopp <daniel.hopp1@gmail.com>"]
 version = "0.1.0"
