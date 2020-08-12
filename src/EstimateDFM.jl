@@ -142,6 +142,10 @@ end
 
 "outputs an output_dfm dict to disk (path = foldername)"
 function export_dfm(;output_dfm::Dict, out_path::String)
+    if !isdir(out_path)
+        mkpath(out_path)
+    end
+
     DataFrame(output_dfm[:Xsmooth]) |> x-> CSV.write("$out_path/X_smooth.csv", x) # :X_smooth
     DataFrame(output_dfm[:Xsmooth_std]) |> x-> CSV.write("$out_path/Xsmooth_std.csv", x) # :Xsmooth_std
     DataFrame(output_dfm[:Z]) |> x-> CSV.write("$out_path/Z.csv", x) # :Z
@@ -200,12 +204,19 @@ end
       dataframe with all missing values filled + predictions
 """
 function predict_dfm(data::DataFrame; output_dfm, months_ahead::Int, lag=0)
-    date_col = date_col_name(data)
-    Y = copy(data[!, Not(date_col)])
-    dates = copy(data[!, date_col])
+    orig_col_order = names(data)
+    cp_data = copy(data)
+    date_col = date_col_name(cp_data)
+    dates = copy(cp_data[!, date_col])
+
+    # put all quarterly variables to the end
+    monthly_quarterly_array = gen_monthly_quarterly(dates, cp_data)
+    cp_data = [cp_data[!, .!monthly_quarterly_array]  cp_data[!, monthly_quarterly_array]]
+
+    Y = copy(cp_data[!, Not(date_col)])
 
     # add months
-    last_date = data[end, date_col]
+    last_date = cp_data[end, date_col]
     row = DataFrame(eachrow(Y)[1:months_ahead])
     row .= missing
     Y = vcat(Y, row)
@@ -216,6 +227,7 @@ function predict_dfm(data::DataFrame; output_dfm, months_ahead::Int, lag=0)
     predictions = kalman_filter_constparams(Y; output_dfm=output_dfm, lag=lag)[:X_smooth] |> DataFrame
     predictions[!, :date] = dates
     predictions =  predictions[!, [:date; Symbol.(names(predictions)[1:end-1])]]
-    rename!(predictions, names(data))
+    rename!(predictions, names(cp_data))
+    predictions = predictions[!, orig_col_order]
     return predictions
 end

@@ -151,6 +151,9 @@ end
 
 	predictions = predict_dfm(sample_data; output_dfm=output, months_ahead=3, lag=0)
 	@test sum([sum(i) for i in eachcol(predictions)[2:end]]) ≈ 14.124786767120007
+
+	predictions = predict_dfm(sample_data[!, [1; end; collect(2:ncol(sample_data)-1)]]; output_dfm=output, months_ahead=3, lag=0)
+	@test sum(predictions[!, Symbol("x_world.sa")]) ≈ 2.530142809708778
 end
 
 @testset "Update" begin
@@ -181,6 +184,7 @@ end
 	calc  = estimate_dfm(sample_data; blocks=blocks, p=1, max_iter=100, threshold=1e-5)
 	export_dfm(output_dfm=calc, out_path="output")
 	imported  = import_dfm(path="output")
+	rm("output", recursive=true)
 
 	predcalc = predict_dfm(sample_data; output_dfm=calc, months_ahead=3, lag=0)
 	@test sum([sum(i) for i in eachcol(predcalc)[2:end]]) ≈ 15.531695602544705
